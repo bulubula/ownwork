@@ -86,6 +86,7 @@ $participatingProjects = $stmt->fetchAll();
         </div>
 
         <div class="card">
+
             <div class="card-header">
                 <h2>我参与的项目</h2>
                 <span class="muted">共 <?= count($participatingProjects) ?> 个</span>

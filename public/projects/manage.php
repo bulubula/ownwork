@@ -188,6 +188,7 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
     <?php endforeach; ?>
 
     <?php if ($success): ?>
+
         <div class="alert alert-success"><?= e($success) ?></div>
     <?php endif; ?>
 
