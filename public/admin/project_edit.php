@@ -67,17 +67,20 @@ $users = $pdo->query('SELECT id, name, role FROM users ORDER BY name')->fetchAll
 </head>
 <body>
 <div class="container">
-    <div class="flex">
-        <h1>编辑项目：<?= e($project['name']) ?></h1>
-        <div><a href="/admin/projects.php">返回项目管理</a></div>
-    </div>
+    <header class="page-header">
+        <div class="title-group">
+            <h1>编辑项目</h1>
+            <small>当前项目：<?= e($project['name']) ?></small>
+        </div>
+        <a class="btn-link" href="/admin/projects.php">返回项目管理</a>
+    </header>
 
     <?php foreach ($errors as $message): ?>
         <div class="alert alert-error"><?= e($message) ?></div>
     <?php endforeach; ?>
 
     <?php if ($success): ?>
-        <div class="alert" style="background:#d1e7dd;color:#0f5132;"><?= e($success) ?></div>
+        <div class="alert alert-success"><?= e($success) ?></div>
     <?php endif; ?>
 
     <div class="card">

@@ -76,18 +76,21 @@ $levels = $pdo->query('SELECT DISTINCT level FROM projects ORDER BY level')->fet
 </head>
 <body>
 <div class="container">
-    <div class="flex">
-        <h1>分配情况总览</h1>
-        <div><a href="/dashboard.php">返回控制面板</a></div>
-    </div>
+    <header class="page-header">
+        <div class="title-group">
+            <h1>分配情况总览</h1>
+            <small>按项目维度筛选并导出所有奖励分配记录</small>
+        </div>
+        <a class="btn-link" href="/dashboard.php">返回控制面板</a>
+    </header>
 
     <div class="card">
-        <form method="get" class="flex" style="gap:10px; flex-wrap: wrap;">
-            <div style="flex:1 1 200px;">
+        <form method="get" class="filter-form">
+            <div class="filter-field">
                 <label>项目名称</label>
                 <input type="text" name="name" value="<?= e($name) ?>" placeholder="模糊查询">
             </div>
-            <div style="flex:1 1 200px;">
+            <div class="filter-field">
                 <label>项目类别</label>
                 <select name="category">
                     <option value="">全部</option>
@@ -96,7 +99,7 @@ $levels = $pdo->query('SELECT DISTINCT level FROM projects ORDER BY level')->fet
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div style="flex:1 1 200px;">
+            <div class="filter-field">
                 <label>项目层级</label>
                 <select name="level">
                     <option value="">全部</option>
@@ -105,50 +108,52 @@ $levels = $pdo->query('SELECT DISTINCT level FROM projects ORDER BY level')->fet
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div style="align-self: flex-end;">
+            <div class="filter-actions">
                 <button type="submit">筛选</button>
-                <a class="badge" href="/admin/allocations.php">重置</a>
+                <a class="ghost-button" href="/admin/allocations.php">重置</a>
             </div>
         </form>
     </div>
 
     <div class="card">
-        <div class="flex" style="margin-bottom: 10px;">
+        <div class="card-header">
             <h2>分配明细</h2>
-            <a href="/admin/allocations.php?<?= e(http_build_query(array_filter(['name' => $name, 'category' => $category, 'level' => $level, 'export' => '1']))) ?>">导出CSV</a>
+            <a class="ghost-button" href="/admin/allocations.php?<?= e(http_build_query(array_filter(['name' => $name, 'category' => $category, 'level' => $level, 'export' => '1']))) ?>">导出 CSV</a>
         </div>
-        <table class="table">
-            <thead>
-            <tr>
-                <th>项目名称</th>
-                <th>类别</th>
-                <th>层级</th>
-                <th>总金额</th>
-                <th>负责人</th>
-                <th>成员</th>
-                <th>角色</th>
-                <th>分配金额</th>
-            </tr>
-            </thead>
-            <tbody>
-            <?php if ($rows): ?>
-                <?php foreach ($rows as $row): ?>
-                    <tr>
-                        <td><?= e($row['project_name']) ?></td>
-                        <td><?= e($row['category']) ?></td>
-                        <td><?= e($row['level']) ?></td>
-                        <td><?= format_currency($row['total_amount']) ?></td>
-                        <td><?= e($row['manager_name']) ?></td>
-                        <td><?= e($row['member_name']) ?></td>
-                        <td><?= e($row['member_role']) ?></td>
-                        <td><?= format_currency($row['amount']) ?></td>
-                    </tr>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <tr><td colspan="8">暂无数据。</td></tr>
-            <?php endif; ?>
-            </tbody>
-        </table>
+        <div class="table-wrapper">
+            <table class="table">
+                <thead>
+                <tr>
+                    <th>项目名称</th>
+                    <th>类别</th>
+                    <th>层级</th>
+                    <th>总金额</th>
+                    <th>负责人</th>
+                    <th>成员</th>
+                    <th>角色</th>
+                    <th>分配金额</th>
+                </tr>
+                </thead>
+                <tbody>
+                <?php if ($rows): ?>
+                    <?php foreach ($rows as $row): ?>
+                        <tr>
+                            <td><?= e($row['project_name']) ?></td>
+                            <td><?= e($row['category']) ?></td>
+                            <td><?= e($row['level']) ?></td>
+                            <td><?= format_currency($row['total_amount']) ?></td>
+                            <td><?= e($row['manager_name']) ?></td>
+                            <td><?= e($row['member_name']) ?></td>
+                            <td><?= e($row['member_role']) ?></td>
+                            <td><?= format_currency($row['amount']) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr><td colspan="8">暂无数据。</td></tr>
+                <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 </body>

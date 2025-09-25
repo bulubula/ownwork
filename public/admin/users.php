@@ -73,17 +73,20 @@ $users = $pdo->query('SELECT id, name, login_id, role, birthdate, created_at FRO
 </head>
 <body>
 <div class="container">
-    <div class="flex">
-        <h1>用户管理</h1>
-        <div><a href="/dashboard.php">返回控制面板</a></div>
-    </div>
+    <header class="page-header">
+        <div class="title-group">
+            <h1>用户管理</h1>
+            <small>维护登录账号与角色权限</small>
+        </div>
+        <a class="btn-link" href="/dashboard.php">返回控制面板</a>
+    </header>
 
     <?php foreach ($errors as $message): ?>
         <div class="alert alert-error"><?= e($message) ?></div>
     <?php endforeach; ?>
 
     <?php if ($success): ?>
-        <div class="alert" style="background:#d1e7dd;color:#0f5132;"><?= e($success) ?></div>
+        <div class="alert alert-success"><?= e($success) ?></div>
     <?php endif; ?>
 
     <div class="card">
@@ -108,38 +111,40 @@ $users = $pdo->query('SELECT id, name, login_id, role, birthdate, created_at FRO
 
     <div class="card">
         <h2>用户列表</h2>
-        <table class="table">
-            <thead>
-            <tr>
-                <th>ID</th>
-                <th>姓名</th>
-                <th>用户编号</th>
-                <th>角色</th>
-                <th>出生日期</th>
-                <th>创建时间</th>
-                <th>操作</th>
-            </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($users as $row): ?>
+        <div class="table-wrapper">
+            <table class="table">
+                <thead>
                 <tr>
-                    <td><?= (int)$row['id'] ?></td>
-                    <td><?= e($row['name']) ?></td>
-                    <td><?= e($row['login_id']) ?></td>
-                    <td><span class="badge"><?= e($row['role']) ?></span></td>
-                    <td><?= e($row['birthdate']) ?></td>
-                    <td><?= e($row['created_at']) ?></td>
-                    <td>
-                        <form method="post" class="inline" onsubmit="return confirm('确认将密码重置为出生日期（8位数字）吗？');">
-                            <input type="hidden" name="action" value="reset_password">
-                            <input type="hidden" name="user_id" value="<?= (int)$row['id'] ?>">
-                            <button type="submit" class="secondary">重置密码</button>
-                        </form>
-                    </td>
+                    <th>ID</th>
+                    <th>姓名</th>
+                    <th>用户编号</th>
+                    <th>角色</th>
+                    <th>出生日期</th>
+                    <th>创建时间</th>
+                    <th>操作</th>
                 </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                <?php foreach ($users as $row): ?>
+                    <tr>
+                        <td><?= (int)$row['id'] ?></td>
+                        <td><?= e($row['name']) ?></td>
+                        <td><?= e($row['login_id']) ?></td>
+                        <td><span class="badge"><?= e($row['role']) ?></span></td>
+                        <td><?= e($row['birthdate']) ?></td>
+                        <td><?= e($row['created_at']) ?></td>
+                        <td>
+                            <form method="post" class="inline" onsubmit="return confirm('确认将密码重置为出生日期（8位数字）吗？');">
+                                <input type="hidden" name="action" value="reset_password">
+                                <input type="hidden" name="user_id" value="<?= (int)$row['id'] ?>">
+                                <button type="submit" class="secondary">重置密码</button>
+                            </form>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 </body>

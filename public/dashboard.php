@@ -29,76 +29,91 @@ $participatingProjects = $stmt->fetchAll();
 </head>
 <body>
 <div class="container">
-    <div class="flex">
-        <h1>欢迎，<?= e($user['name']) ?>（<?= e($user['role']) ?>）</h1>
-        <div>
-            <a href="/index.php?action=logout">退出登录</a>
+    <header class="page-header">
+        <div class="title-group">
+            <h1>欢迎，<?= e($user['name']) ?></h1>
+            <small>当前角色：<?= e($user['role']) ?></small>
         </div>
-    </div>
+        <a class="btn-link" href="/index.php?action=logout">退出登录</a>
+    </header>
 
     <?php if ($user['role'] === '管理员'): ?>
         <div class="card">
-            <h2>管理员菜单</h2>
-            <ul>
-                <li><a href="/admin/users.php">用户管理</a></li>
-                <li><a href="/admin/projects.php">项目管理</a></li>
-                <li><a href="/admin/allocations.php">分配情况查看与导出</a></li>
-            </ul>
+            <div class="card-header">
+                <h2>管理员菜单</h2>
+                <span class="muted">快速进入后台管理模块</span>
+            </div>
+            <div class="actions">
+                <a class="ghost-button" href="/admin/users.php">用户管理</a>
+                <a class="ghost-button" href="/admin/projects.php">项目管理</a>
+                <a class="ghost-button" href="/admin/allocations.php">分配明细</a>
+            </div>
         </div>
     <?php else: ?>
         <div class="card">
-            <h2>我负责的项目</h2>
+            <div class="card-header">
+                <h2>我负责的项目</h2>
+                <span class="muted">共 <?= count($managedProjects) ?> 个</span>
+            </div>
             <?php if ($managedProjects): ?>
-                <table class="table">
-                    <thead>
-                    <tr>
-                        <th>项目名称</th>
-                        <th>项目类别</th>
-                        <th>项目层级</th>
-                        <th>总金额</th>
-                        <th>操作</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach ($managedProjects as $project): ?>
+                <div class="table-wrapper">
+                    <table class="table">
+                        <thead>
                         <tr>
-                            <td><?= e($project['name']) ?></td>
-                            <td><?= e($project['category']) ?></td>
-                            <td><?= e($project['level']) ?></td>
-                            <td><?= format_currency($project['total_amount']) ?></td>
-                            <td><a href="/projects/manage.php?id=<?= (int)$project['id'] ?>">编辑分配</a></td>
+                            <th>项目名称</th>
+                            <th>项目类别</th>
+                            <th>项目层级</th>
+                            <th>总金额</th>
+                            <th>操作</th>
                         </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                        <?php foreach ($managedProjects as $project): ?>
+                            <tr>
+                                <td><?= e($project['name']) ?></td>
+                                <td><?= e($project['category']) ?></td>
+                                <td><?= e($project['level']) ?></td>
+                                <td><?= format_currency($project['total_amount']) ?></td>
+                                <td><a class="btn-link" href="/projects/manage.php?id=<?= (int)$project['id'] ?>">编辑分配</a></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             <?php else: ?>
-                <p>当前没有您负责的项目。</p>
+                <p class="muted">当前没有您负责的项目。</p>
             <?php endif; ?>
         </div>
 
         <div class="card">
-            <h2>我参与的项目</h2>
+
+            <div class="card-header">
+                <h2>我参与的项目</h2>
+                <span class="muted">共 <?= count($participatingProjects) ?> 个</span>
+            </div>
             <?php if ($participatingProjects): ?>
-                <table class="table">
-                    <thead>
-                    <tr>
-                        <th>项目名称</th>
-                        <th>角色</th>
-                        <th>分配金额</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach ($participatingProjects as $project): ?>
+                <div class="table-wrapper">
+                    <table class="table">
+                        <thead>
                         <tr>
-                            <td><?= e($project['name']) ?></td>
-                            <td><?= e($user['role']) ?></td>
-                            <td><?= format_currency($project['amount']) ?></td>
+                            <th>项目名称</th>
+                            <th>角色</th>
+                            <th>分配金额</th>
                         </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                        <?php foreach ($participatingProjects as $project): ?>
+                            <tr>
+                                <td><?= e($project['name']) ?></td>
+                                <td><?= e($user['role']) ?></td>
+                                <td><?= format_currency($project['amount']) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             <?php else: ?>
-                <p>您尚未获得任何项目分配。</p>
+                <p class="muted">您尚未获得任何项目分配。</p>
             <?php endif; ?>
         </div>
     <?php endif; ?>

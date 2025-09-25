@@ -156,6 +156,8 @@ $stmt = $pdo->prepare('SELECT a.id, a.amount, u.id AS user_id, u.name, u.role FR
 $stmt->execute(['project_id' => $projectId]);
 $allocations = $stmt->fetchAll();
 
+$remainingSlots = max(0, 15 - count($allocations));
+
 $memberIds = array_column($allocations, 'user_id');
 $availableMembers = $pdo->prepare('SELECT id, name, role FROM users WHERE role <> "高层" ORDER BY name');
 $availableMembers->execute();
@@ -172,23 +174,30 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
 </head>
 <body>
 <div class="container">
-    <div class="flex">
-        <h1>分配管理：<?= e($project['name']) ?></h1>
-        <div><a href="/dashboard.php">返回控制面板</a></div>
-    </div>
-    <p>项目类别：<?= e($project['category']) ?> ｜ 项目层级：<?= e($project['level']) ?> ｜ 总金额：<?= format_currency($project['total_amount']) ?></p>
+    <header class="page-header">
+        <div class="title-group">
+            <h1>分配管理</h1>
+            <small>当前项目：<?= e($project['name']) ?></small>
+        </div>
+        <a class="btn-link" href="/dashboard.php">返回控制面板</a>
+    </header>
+    <p class="project-meta">项目类别：<?= e($project['category']) ?> ｜ 项目层级：<?= e($project['level']) ?> ｜ 总金额：<?= format_currency($project['total_amount']) ?></p>
 
     <?php foreach ($errors as $message): ?>
         <div class="alert alert-error"><?= e($message) ?></div>
     <?php endforeach; ?>
 
     <?php if ($success): ?>
-        <div class="alert" style="background:#d1e7dd;color:#0f5132;"><?= e($success) ?></div>
+
+        <div class="alert alert-success"><?= e($success) ?></div>
     <?php endif; ?>
 
     <div class="card">
-        <h2>项目成员（最多15人）</h2>
-        <form method="post" class="inline" style="margin-bottom: 15px;">
+        <div class="card-header">
+            <h2>项目成员（最多15人）</h2>
+            <span class="muted">剩余名额 <?= $remainingSlots ?> 人</span>
+        </div>
+        <form method="post" class="member-actions">
             <input type="hidden" name="action" value="add_member">
             <select name="user_id" required>
                 <option value="">选择成员</option>
@@ -201,35 +210,37 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
 
         <?php if ($allocations): ?>
             <form method="post">
-                <table class="table">
-                    <thead>
-                    <tr>
-                        <th>成员</th>
-                        <th>角色</th>
-                        <th>分配金额</th>
-                        <th>操作</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach ($allocations as $allocation): ?>
+                <div class="table-wrapper">
+                    <table class="table">
+                        <thead>
                         <tr>
-                            <td><?= e($allocation['name']) ?></td>
-                            <td><?= e($allocation['role']) ?></td>
-                            <td>
-                                <input type="hidden" name="allocation_id[]" value="<?= (int)$allocation['id'] ?>">
-                                <input type="number" step="0.01" name="amount[]" value="<?= e($allocation['amount']) ?>" required>
-                            </td>
-                            <td>
-                                <button type="submit" name="remove" value="<?= (int)$allocation['id'] ?>" class="secondary" onclick="return confirm('确认删除该成员？');">删除</button>
-                            </td>
+                            <th>成员</th>
+                            <th>角色</th>
+                            <th>分配金额</th>
+                            <th>操作</th>
                         </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                        <?php foreach ($allocations as $allocation): ?>
+                            <tr>
+                                <td><?= e($allocation['name']) ?></td>
+                                <td><?= e($allocation['role']) ?></td>
+                                <td>
+                                    <input type="hidden" name="allocation_id[]" value="<?= (int)$allocation['id'] ?>">
+                                    <input type="number" step="0.01" name="amount[]" value="<?= e($allocation['amount']) ?>" required>
+                                </td>
+                                <td>
+                                    <button type="submit" name="remove" value="<?= (int)$allocation['id'] ?>" class="secondary" onclick="return confirm('确认删除该成员？');">删除</button>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
                 <button type="submit" name="save_allocations" value="1">保存分配金额</button>
             </form>
         <?php else: ?>
-            <p>尚未添加任何项目成员。</p>
+            <p class="muted">尚未添加任何项目成员。</p>
         <?php endif; ?>
     </div>
 </div>

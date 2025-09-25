@@ -40,20 +40,23 @@ if ($user) {
     <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-<div class="container">
-    <h1>奖励分配系统</h1>
-    <?php if ($error): ?>
-        <div class="alert alert-error"><?= e($error) ?></div>
-    <?php endif; ?>
-    <form method="post" class="card">
-        <label for="login_id">用户编号</label>
-        <input type="text" id="login_id" name="login_id" required>
+<div class="auth-layout">
+    <div class="card">
+        <h1>奖励分配系统</h1>
+        <p class="muted">请使用个人用户编号与出生日期默认密码登录系统，首次登录后请及时修改密码。</p>
+        <?php if ($error): ?>
+            <div class="alert alert-error"><?= e($error) ?></div>
+        <?php endif; ?>
+        <form method="post">
+            <label for="login_id">用户编号</label>
+            <input type="text" id="login_id" name="login_id" required>
 
-        <label for="password">密码</label>
-        <input type="password" id="password" name="password" required>
+            <label for="password">密码</label>
+            <input type="password" id="password" name="password" required>
 
-        <button type="submit">登录</button>
-    </form>
+            <button type="submit">登录</button>
+        </form>
+    </div>
 </div>
 </body>
 </html>
