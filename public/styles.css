@@ -246,6 +246,16 @@ button:disabled,
     font-weight: 600;
 }
 
+.badge-success {
+    background: rgba(16, 185, 129, 0.18);
+    color: #047857;
+}
+
+.badge-pending {
+    background: rgba(251, 191, 36, 0.22);
+    color: #92400e;
+}
+
 form.inline {
     display: inline;
 }

@@ -45,7 +45,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $users = $pdo->query('SELECT id, name, role FROM users ORDER BY name')->fetchAll();
-$projects = $pdo->query('SELECT p.*, u.name AS manager_name FROM projects p JOIN users u ON p.manager_id = u.id ORDER BY p.name')->fetchAll();
+$stmt = $pdo->query('SELECT p.id, p.name, p.category, p.level, p.total_amount, p.manager_id, u.name AS manager_name,
+    COALESCE(stats.allocated_sum, 0) AS allocated_sum, COALESCE(stats.allocation_count, 0) AS allocation_count
+    FROM projects p
+    JOIN users u ON p.manager_id = u.id
+    LEFT JOIN (
+        SELECT project_id, SUM(amount) AS allocated_sum, COUNT(*) AS allocation_count
+        FROM allocations
+        GROUP BY project_id
+    ) AS stats ON stats.project_id = p.id
+    ORDER BY p.name');
+$projects = $stmt->fetchAll();
+$completedCount = 0;
+foreach ($projects as &$project) {
+    $memberCount = (int)($project['allocation_count'] ?? 0);
+    $allocatedSum = (float)($project['allocated_sum'] ?? 0.0);
+    $totalAmount = (float)$project['total_amount'];
+    $project['is_completed'] = $memberCount > 0 && abs($allocatedSum - $totalAmount) <= 0.01;
+    if ($project['is_completed']) {
+        $completedCount++;
+    }
+}
+unset($project);
+$pendingCount = count($projects) - $completedCount;
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -96,7 +118,10 @@ $projects = $pdo->query('SELECT p.*, u.name AS manager_name FROM projects p JOIN
     </div>
 
     <div class="card">
-        <h2>项目列表</h2>
+        <div class="card-header">
+            <h2>项目列表</h2>
+            <span class="muted">已完成 <?= $completedCount ?> 个 ｜ 待完成 <?= $pendingCount ?> 个</span>
+        </div>
         <div class="table-wrapper">
             <table class="table">
                 <thead>
@@ -106,6 +131,7 @@ $projects = $pdo->query('SELECT p.*, u.name AS manager_name FROM projects p JOIN
                     <th>层级</th>
                     <th>总金额</th>
                     <th>负责人</th>
+                    <th>分配状态</th>
                     <th>操作</th>
                 </tr>
                 </thead>
@@ -117,6 +143,13 @@ $projects = $pdo->query('SELECT p.*, u.name AS manager_name FROM projects p JOIN
                         <td><?= e($project['level']) ?></td>
                         <td><?= format_currency($project['total_amount']) ?></td>
                         <td><?= e($project['manager_name']) ?></td>
+                        <td>
+                            <?php if ($project['is_completed']): ?>
+                                <span class="badge badge-success">已分配完成</span>
+                            <?php else: ?>
+                                <span class="badge badge-pending">待分配</span>
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <a class="btn-link" href="/admin/project_edit.php?id=<?= (int)$project['id'] ?>">编辑</a>
                         </td>
