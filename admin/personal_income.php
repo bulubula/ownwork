@@ -43,6 +43,7 @@ if (isset($_GET['export']) && $_GET['export'] === '1') {
     header('Content-Type: text/csv; charset=UTF-8');
     header('Content-Disposition: attachment; filename="personal_income.csv"');
     $output = fopen('php://output', 'w');
+    fwrite($output, "\xEF\xBB\xBF");
     fputcsv($output, ['姓名', '工号', '角色', '分配总额']);
     foreach ($rows as $row) {
         fputcsv($output, [
