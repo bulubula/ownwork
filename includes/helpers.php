@@ -75,4 +75,3 @@ function asset_url(string $path): string
 {
     return url_for($path);
 }
-

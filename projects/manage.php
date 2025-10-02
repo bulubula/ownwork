@@ -9,7 +9,7 @@ $user = current_user();
 $pdo = get_pdo();
 
 $projectId = (int)($_GET['id'] ?? 0);
-$stmt = $pdo->prepare('SELECT p.*, u.name AS manager_name, u.id AS manager_id FROM projects p JOIN users u ON p.manager_id = u.id WHERE p.id = :id');
+$stmt = $pdo->prepare('SELECT p.*, u.name AS manager_name, u.id AS manager_id, u.login_id AS manager_login_id FROM projects p JOIN users u ON p.manager_id = u.id WHERE p.id = :id');
 $stmt->execute(['id' => $projectId]);
 $project = $stmt->fetch();
 
@@ -152,14 +152,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$stmt = $pdo->prepare('SELECT a.id, a.amount, u.id AS user_id, u.name, u.role FROM allocations a JOIN users u ON a.user_id = u.id WHERE a.project_id = :project_id ORDER BY u.name');
+$stmt = $pdo->prepare('SELECT a.id, a.amount, u.id AS user_id, u.name, u.role, u.login_id FROM allocations a JOIN users u ON a.user_id = u.id WHERE a.project_id = :project_id ORDER BY u.name');
 $stmt->execute(['project_id' => $projectId]);
 $allocations = $stmt->fetchAll();
 
 $remainingSlots = max(0, 15 - count($allocations));
 
 $memberIds = array_column($allocations, 'user_id');
-$availableMembers = $pdo->prepare('SELECT id, name, role FROM users WHERE role <> "高层" ORDER BY name');
+$availableMembers = $pdo->prepare('SELECT id, name, role, login_id FROM users WHERE role <> "高层" ORDER BY name');
 $availableMembers->execute();
 $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) use ($memberIds) {
     return !in_array($row['id'], $memberIds, true);
@@ -181,7 +181,7 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
         </div>
         <a class="btn-link" href="<?= e(url_for('dashboard.php')) ?>">返回控制面板</a>
     </header>
-    <p class="project-meta">项目类别：<?= e($project['category']) ?> ｜ 项目层级：<?= e($project['level']) ?> ｜ 总金额：<?= format_currency($project['total_amount']) ?></p>
+    <p class="project-meta">项目类别：<?= e($project['category']) ?> ｜ 项目层级：<?= e($project['level']) ?> ｜ 总金额：<?= format_currency($project['total_amount']) ?> ｜ 项目负责人：<?= e($project['manager_name']) ?>（工号：<?= e($project['manager_login_id']) ?>）</p>
 
     <?php foreach ($errors as $message): ?>
         <div class="alert alert-error"><?= e($message) ?></div>
@@ -198,12 +198,19 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
         </div>
         <form method="post" class="member-actions">
             <input type="hidden" name="action" value="add_member">
-            <select name="user_id" required>
-                <option value="">选择成员</option>
-                <?php foreach ($allUsers as $candidate): ?>
-                    <option value="<?= (int)$candidate['id'] ?>"><?= e($candidate['name']) ?>（<?= e($candidate['role']) ?>）</option>
-                <?php endforeach; ?>
-            </select>
+            <div class="member-picker">
+                <label class="member-search-label" for="member-search">搜索成员（支持姓名或工号部分匹配）</label>
+                <input type="text" id="member-search" class="member-search" placeholder="输入关键字筛选">
+                <select name="user_id" id="member-select" required>
+                    <option value="">选择成员</option>
+                    <?php foreach ($allUsers as $candidate): ?>
+                        <option value="<?= (int)$candidate['id'] ?>" data-name="<?= e($candidate['name']) ?>" data-login="<?= e($candidate['login_id']) ?>">
+                            <?= e($candidate['name']) ?>（工号：<?= e($candidate['login_id']) ?>｜<?= e($candidate['role']) ?>）
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="muted member-hint">候选成员仅包含非高层用户，可输入姓名或工号关键字筛选。</p>
+            </div>
             <button type="submit">添加成员</button>
         </form>
 
@@ -214,6 +221,7 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
                         <thead>
                         <tr>
                             <th>成员</th>
+                            <th>工号</th>
                             <th>角色</th>
                             <th>分配金额</th>
                             <th>操作</th>
@@ -223,6 +231,7 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
                         <?php foreach ($allocations as $allocation): ?>
                             <tr>
                                 <td><?= e($allocation['name']) ?></td>
+                                <td><?= e($allocation['login_id']) ?></td>
                                 <td><?= e($allocation['role']) ?></td>
                                 <td>
                                     <input type="hidden" name="allocation_id[]" value="<?= (int)$allocation['id'] ?>">
@@ -243,5 +252,45 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
         <?php endif; ?>
     </div>
 </div>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var searchInput = document.getElementById('member-search');
+        var select = document.getElementById('member-select');
+        if (!searchInput || !select) {
+            return;
+        }
+
+        var options = Array.prototype.slice.call(select.querySelectorAll('option'));
+
+        function applyFilter(keyword) {
+            var normalized = keyword.trim().toLowerCase();
+            var firstVisible = null;
+            options.forEach(function (option) {
+                if (!option.value) {
+                    option.hidden = false;
+                    return;
+                }
+                var text = option.textContent.toLowerCase();
+                var matches = normalized === '' || text.indexOf(normalized) !== -1;
+                option.hidden = !matches;
+                if (matches && !firstVisible) {
+                    firstVisible = option;
+                }
+            });
+
+            if (normalized !== '') {
+                if (firstVisible) {
+                    select.value = firstVisible.value;
+                } else {
+                    select.value = '';
+                }
+            }
+        }
+
+        searchInput.addEventListener('input', function () {
+            applyFilter(searchInput.value);
+        });
+    });
+</script>
 </body>
 </html>

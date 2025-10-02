@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$users = $pdo->query('SELECT id, name, role FROM users ORDER BY name')->fetchAll();
+$users = $pdo->query('SELECT id, name, role, login_id FROM users ORDER BY name')->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -96,7 +96,7 @@ $users = $pdo->query('SELECT id, name, role FROM users ORDER BY name')->fetchAll
             <label>项目负责人</label>
             <select name="manager_id" required>
                 <?php foreach ($users as $u): ?>
-                    <option value="<?= (int)$u['id'] ?>" <?= $project['manager_id'] == $u['id'] ? 'selected' : '' ?>><?= e($u['name']) ?>（<?= e($u['role']) ?>）</option>
+                    <option value="<?= (int)$u['id'] ?>" <?= $project['manager_id'] == $u['id'] ? 'selected' : '' ?>><?= e($u['name']) ?>（工号：<?= e($u['login_id']) ?>｜<?= e($u['role']) ?>）</option>
                 <?php endforeach; ?>
             </select>
             <button type="submit">保存</button>

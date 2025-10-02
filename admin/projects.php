@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/bootstrap.php';
+require_once __DIR__ . '/../includes/excel.php';
 
 require_login();
 require_role(['管理员']);
@@ -13,39 +14,183 @@ $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
-    if ($action === 'add') {
-        $name = trim($_POST['name'] ?? '');
-        $category = trim($_POST['category'] ?? '');
-        $level = trim($_POST['level'] ?? '');
-        $totalAmount = (float)($_POST['total_amount'] ?? 0);
-        $managerId = (int)($_POST['manager_id'] ?? 0);
-
-        if ($name === '' || $category === '' || $level === '' || $totalAmount <= 0 || $managerId <= 0) {
-            $errors[] = '请完整填写项目资料，金额需大于0。';
+    if ($action === 'import') {
+        if (!isset($_FILES['project_file']) || !is_uploaded_file($_FILES['project_file']['tmp_name'])) {
+            $errors[] = '请上传 Excel 文件。';
         } else {
-            try {
-                $stmt = $pdo->prepare('INSERT INTO projects (name, category, level, total_amount, manager_id) VALUES (:name, :category, :level, :total_amount, :manager_id)');
-                $stmt->execute([
-                    'name' => $name,
-                    'category' => $category,
-                    'level' => $level,
-                    'total_amount' => $totalAmount,
-                    'manager_id' => $managerId,
-                ]);
-                $success = '项目创建成功。';
-            } catch (PDOException $exception) {
-                if ((int)$exception->errorInfo[1] === 1062) {
-                    $errors[] = '项目名称重复，请更换后重试。';
+            $file = $_FILES['project_file'];
+            if ((int) $file['error'] !== UPLOAD_ERR_OK) {
+                $errors[] = '文件上传失败，请重试。';
+            } else {
+                $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                if ($extension !== 'xlsx') {
+                    $errors[] = '仅支持 .xlsx 格式的 Excel 文件。';
                 } else {
-                    $errors[] = '创建项目失败：' . $exception->getMessage();
+                    try {
+                        $rows = read_xlsx($file['tmp_name']);
+                    } catch (RuntimeException $exception) {
+                        $rows = [];
+                        $errors[] = $exception->getMessage();
+                    }
+
+                    if (!$errors) {
+                        if (count($rows) < 2) {
+                            $errors[] = 'Excel 文件中未找到有效数据行。';
+                        } else {
+                            $headers = array_map('trim', $rows[0]);
+                            $requiredHeaders = ['项目名称', '项目类别', '项目层级', '项目总金额', '项目负责人工号'];
+                            $headerMap = [];
+                            foreach ($headers as $index => $header) {
+                                if ($header !== '') {
+                                    $headerMap[$header] = $index;
+                                }
+                            }
+                            foreach ($requiredHeaders as $requiredHeader) {
+                                if (!array_key_exists($requiredHeader, $headerMap)) {
+                                    $errors[] = 'Excel 中缺少必要列：“' . $requiredHeader . '”。';
+                                }
+                            }
+
+                            $records = [];
+                            $nameMap = [];
+                            $managerLoginIds = [];
+
+                            if (!$errors) {
+                                $rowCount = count($rows);
+                                for ($i = 1; $i < $rowCount; $i++) {
+                                    $rowNumber = $i + 1;
+                                    $row = $rows[$i];
+                                    $name = trim($row[$headerMap['项目名称']] ?? '');
+                                    $category = trim($row[$headerMap['项目类别']] ?? '');
+                                    $level = trim($row[$headerMap['项目层级']] ?? '');
+                                    $amountRaw = $row[$headerMap['项目总金额']] ?? '';
+                                    $managerLogin = trim($row[$headerMap['项目负责人工号']] ?? '');
+
+                                    if ($name === '' || $category === '' || $level === '' || $managerLogin === '') {
+                                        $errors[] = '第 ' . $rowNumber . ' 行存在空值，请检查项目名称、类别、层级或负责人工号。';
+                                        continue;
+                                    }
+
+                                    $amountString = is_string($amountRaw) ? trim($amountRaw) : (string) $amountRaw;
+                                    $normalizedAmount = null;
+                                    if ($amountString === '') {
+                                        $normalizedAmount = 0.0;
+                                    } elseif (is_numeric($amountString)) {
+                                        $normalizedAmount = (float) $amountString;
+                                    } else {
+                                        $clean = str_replace(['，', ',', ' '], '', $amountString);
+                                        if ($clean !== '' && is_numeric($clean)) {
+                                            $normalizedAmount = (float) $clean;
+                                        }
+                                    }
+
+                                    if ($normalizedAmount === null) {
+                                        $errors[] = '第 ' . $rowNumber . ' 行的项目总金额格式无效。';
+                                    } elseif ($normalizedAmount <= 0) {
+                                        $errors[] = '第 ' . $rowNumber . ' 行的项目总金额需大于 0。';
+                                    }
+
+                                    if (isset($nameMap[$name])) {
+                                        $errors[] = 'Excel 中项目名称重复：' . $name . '（第 ' . $nameMap[$name] . ' 行与第 ' . $rowNumber . ' 行）。';
+                                    } else {
+                                        $nameMap[$name] = $rowNumber;
+                                    }
+
+                                    $managerLoginIds[$managerLogin] = true;
+
+                                    if ($errors) {
+                                        continue;
+                                    }
+
+                                    $records[] = [
+                                        'name' => $name,
+                                        'category' => $category,
+                                        'level' => $level,
+                                        'total_amount' => round($normalizedAmount, 2),
+                                        'manager_login' => $managerLogin,
+                                        'row' => $rowNumber,
+                                    ];
+                                }
+                            }
+
+                            $mode = $_POST['mode'] ?? 'append';
+                            if (!in_array($mode, ['append', 'replace'], true)) {
+                                $mode = 'append';
+                            }
+
+                            if (!$errors && !$records) {
+                                $errors[] = 'Excel 文件中没有可导入的项目数据。';
+                            }
+
+                            if (!$errors && $records) {
+                                $managerLogins = array_keys($managerLoginIds);
+                                if ($managerLogins) {
+                                    $placeholders = implode(',', array_fill(0, count($managerLogins), '?'));
+                                    $stmt = $pdo->prepare('SELECT id, login_id FROM users WHERE login_id IN (' . $placeholders . ')');
+                                    $stmt->execute($managerLogins);
+                                    $managers = $stmt->fetchAll();
+                                    $managerMap = [];
+                                    foreach ($managers as $manager) {
+                                        $managerMap[$manager['login_id']] = (int) $manager['id'];
+                                    }
+
+                                    foreach ($records as &$record) {
+                                        if (!isset($managerMap[$record['manager_login']])) {
+                                            $errors[] = '第 ' . $record['row'] . ' 行的负责人工号“' . $record['manager_login'] . '”不存在于用户列表中。';
+                                        } else {
+                                            $record['manager_id'] = $managerMap[$record['manager_login']];
+                                        }
+                                    }
+                                    unset($record);
+                                }
+
+                                if ($mode === 'append' && !$errors) {
+                                    $names = array_column($records, 'name');
+                                    $placeholders = implode(',', array_fill(0, count($names), '?'));
+                                    $stmt = $pdo->prepare('SELECT name FROM projects WHERE name IN (' . $placeholders . ')');
+                                    $stmt->execute($names);
+                                    $existing = $stmt->fetchAll(PDO::FETCH_COLUMN);
+                                    if ($existing) {
+                                        $errors[] = '以下项目名称已存在，导入终止：' . implode('、', $existing) . '。';
+                                    }
+                                }
+
+                                if (!$errors) {
+                                    try {
+                                        $pdo->beginTransaction();
+
+                                        if ($mode === 'replace') {
+                                            $pdo->exec('DELETE FROM projects');
+                                        }
+
+                                        $insert = $pdo->prepare('INSERT INTO projects (name, category, level, total_amount, manager_id) VALUES (:name, :category, :level, :total_amount, :manager_id)');
+                                        foreach ($records as $record) {
+                                            $insert->execute([
+                                                'name' => $record['name'],
+                                                'category' => $record['category'],
+                                                'level' => $record['level'],
+                                                'total_amount' => $record['total_amount'],
+                                                'manager_id' => $record['manager_id'],
+                                            ]);
+                                        }
+
+                                        $pdo->commit();
+                                        $success = '成功导入 ' . count($records) . ' 个项目。';
+                                    } catch (Throwable $exception) {
+                                        $pdo->rollBack();
+                                        $errors[] = '导入失败：' . $exception->getMessage();
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-$users = $pdo->query('SELECT id, name, role FROM users ORDER BY name')->fetchAll();
-$stmt = $pdo->query('SELECT p.id, p.name, p.category, p.level, p.total_amount, p.manager_id, u.name AS manager_name,
+$stmt = $pdo->query('SELECT p.id, p.name, p.category, p.level, p.total_amount, p.manager_id, u.name AS manager_name, u.login_id AS manager_login_id,
     COALESCE(stats.allocated_sum, 0) AS allocated_sum, COALESCE(stats.allocation_count, 0) AS allocation_count
     FROM projects p
     JOIN users u ON p.manager_id = u.id
@@ -95,25 +240,24 @@ $pendingCount = count($projects) - $completedCount;
     <?php endif; ?>
 
     <div class="card">
-        <h2>新增项目</h2>
-        <form method="post">
-            <input type="hidden" name="action" value="add">
-            <label>项目名称</label>
-            <input type="text" name="name" required>
-            <label>项目类别</label>
-            <input type="text" name="category" required>
-            <label>项目层级</label>
-            <input type="text" name="level" required>
-            <label>项目总金额</label>
-            <input type="number" step="0.01" name="total_amount" required>
-            <label>项目负责人</label>
-            <select name="manager_id" required>
-                <option value="">请选择负责人</option>
-                <?php foreach ($users as $u): ?>
-                    <option value="<?= (int)$u['id'] ?>"><?= e($u['name']) ?>（<?= e($u['role']) ?>）</option>
-                <?php endforeach; ?>
-            </select>
-            <button type="submit">保存</button>
+        <div class="card-header">
+            <h2>批量导入项目</h2>
+            <span class="muted">支持本地 Excel（.xlsx）模板，可选择仅新增或清空后导入</span>
+        </div>
+        <form method="post" enctype="multipart/form-data" class="import-form">
+            <input type="hidden" name="action" value="import">
+            <label for="project_file">选择 Excel 文件</label>
+            <input type="file" name="project_file" id="project_file" accept=".xlsx" required>
+            <fieldset class="import-mode">
+                <legend>导入模式</legend>
+                <label><input type="radio" name="mode" value="append" checked> 仅新增（已存在的项目名称将阻止导入）</label>
+                <label><input type="radio" name="mode" value="replace"> 清空后导入（会删除现有项目及分配记录）</label>
+            </fieldset>
+            <p class="muted">模板字段需包含：项目名称、项目类别、项目层级、项目总金额、项目负责人工号。项目负责人需先在用户列表中存在。</p>
+            <p class="muted">金额支持 Excel 数值或带千分位的文本，导入后默认保留两位小数。</p>
+            <div class="form-actions">
+                <button type="submit">上传并导入</button>
+            </div>
         </form>
     </div>
 
@@ -142,7 +286,7 @@ $pendingCount = count($projects) - $completedCount;
                         <td><?= e($project['category']) ?></td>
                         <td><?= e($project['level']) ?></td>
                         <td><?= format_currency($project['total_amount']) ?></td>
-                        <td><?= e($project['manager_name']) ?></td>
+                        <td><?= e($project['manager_name']) ?>（工号：<?= e($project['manager_login_id']) ?>）</td>
                         <td>
                             <?php if ($project['is_completed']): ?>
                                 <span class="badge badge-success">已分配完成</span>

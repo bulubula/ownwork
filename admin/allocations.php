@@ -29,7 +29,10 @@ if ($level !== '') {
     $params['level'] = $level;
 }
 
-$sql = 'SELECT p.name AS project_name, p.category, p.level, p.total_amount, u.name AS manager_name, m.name AS member_name, m.role AS member_role, a.amount
+$sql = 'SELECT p.name AS project_name, p.category, p.level, p.total_amount,
+        u.name AS manager_name, u.login_id AS manager_login_id,
+        m.name AS member_name, m.login_id AS member_login_id, m.role AS member_role, a.amount
+
         FROM allocations a
         JOIN projects p ON a.project_id = p.id
         JOIN users m ON a.user_id = m.id
@@ -47,7 +50,8 @@ if (isset($_GET['export']) && $_GET['export'] === '1') {
     header('Content-Type: text/csv; charset=UTF-8');
     header('Content-Disposition: attachment; filename="allocations.csv"');
     $output = fopen('php://output', 'w');
-    fputcsv($output, ['项目名称', '项目类别', '项目层级', '项目总金额', '项目负责人', '项目成员', '成员角色', '分配金额']);
+    fputcsv($output, ['项目名称', '项目类别', '项目层级', '项目总金额', '项目负责人', '负责人工号', '项目成员', '成员工号', '成员角色', '分配金额']);
+
     foreach ($rows as $row) {
         fputcsv($output, [
             $row['project_name'],
@@ -55,7 +59,9 @@ if (isset($_GET['export']) && $_GET['export'] === '1') {
             $row['level'],
             $row['total_amount'],
             $row['manager_name'],
+            $row['manager_login_id'],
             $row['member_name'],
+            $row['member_login_id'],
             $row['member_role'],
             $row['amount'],
         ]);
@@ -129,7 +135,9 @@ $levels = $pdo->query('SELECT DISTINCT level FROM projects ORDER BY level')->fet
                     <th>层级</th>
                     <th>总金额</th>
                     <th>负责人</th>
+                    <th>负责人工号</th>
                     <th>成员</th>
+                    <th>成员工号</th>
                     <th>角色</th>
                     <th>分配金额</th>
                 </tr>
@@ -143,7 +151,9 @@ $levels = $pdo->query('SELECT DISTINCT level FROM projects ORDER BY level')->fet
                             <td><?= e($row['level']) ?></td>
                             <td><?= format_currency($row['total_amount']) ?></td>
                             <td><?= e($row['manager_name']) ?></td>
+                            <td><?= e($row['manager_login_id']) ?></td>
                             <td><?= e($row['member_name']) ?></td>
+                            <td><?= e($row['member_login_id']) ?></td>
                             <td><?= e($row['member_role']) ?></td>
                             <td><?= format_currency($row['amount']) ?></td>
                         </tr>

@@ -47,6 +47,7 @@ $participatingProjects = $stmt->fetchAll();
                 <a class="ghost-button" href="<?= e(url_for('admin/users.php')) ?>">用户管理</a>
                 <a class="ghost-button" href="<?= e(url_for('admin/projects.php')) ?>">项目管理</a>
                 <a class="ghost-button" href="<?= e(url_for('admin/allocations.php')) ?>">分配明细</a>
+                <a class="ghost-button" href="<?= e(url_for('admin/personal_income.php')) ?>">个人所得</a>
             </div>
         </div>
     <?php else: ?>
