@@ -11,16 +11,15 @@
 ## 目录结构
 
 ```
+├── admin                 # 管理员相关页面
+├── dashboard.php         # 登录后的控制台
 ├── database
 │   ├── schema.sql        # 数据库结构定义
 │   └── seed.sql          # 示例数据
 ├── includes              # 公共 PHP 函数
-├── public                # Web 可访问目录
-│   ├── index.php         # 登录页
-│   ├── dashboard.php     # 登录后的控制台
-│   ├── styles.css        # 简易样式
-│   ├── admin             # 管理员相关页面
-│   └── projects          # 项目负责人相关页面
+├── index.php             # 登录页
+├── projects              # 项目负责人相关页面
+├── styles.css            # 全局样式
 └── README.md
 ```
 
@@ -50,13 +49,13 @@
    export DB_PASSWORD=your_password
    ```
 
-3. 将 `public` 目录配置为 Web 服务器的根目录（Nginx、Apache 等），或使用 PHP 内置服务器进行调试：
+3. 将整个项目目录（例如部署在 `mydomain.com/work`）映射为可访问目录，或在项目根目录使用 PHP 内置服务器进行调试：
 
    ```bash
-   php -S 0.0.0.0:8000 -t public
+   php -S 0.0.0.0:8000
    ```
 
-4. 使用浏览器访问 `http://localhost:8000/`。
+4. 使用浏览器访问对应路径，例如 `http://localhost:8000/index.php` 或 `http://localhost:8000/work/`。
 
 ## 默认账户
 

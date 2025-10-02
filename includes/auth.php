@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/helpers.php';
 
 const USER_ROLES = ['普通用户', '中层', '高层', '管理员'];
 
@@ -65,7 +66,7 @@ function logout(): void
 function require_login(): void
 {
     if (!current_user()) {
-        header('Location: /index.php');
+        header('Location: ' . url_for('index.php'));
         exit;
     }
 }
