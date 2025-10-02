@@ -47,6 +47,7 @@ if (isset($_GET['export']) && $_GET['export'] === '1') {
     header('Content-Type: text/csv; charset=UTF-8');
     header('Content-Disposition: attachment; filename="allocations.csv"');
     $output = fopen('php://output', 'w');
+    fwrite($output, "\xEF\xBB\xBF");
     fputcsv($output, ['项目名称', '项目类别', '项目层级', '项目总金额', '项目负责人', '项目成员', '成员角色', '分配金额']);
     foreach ($rows as $row) {
         fputcsv($output, [

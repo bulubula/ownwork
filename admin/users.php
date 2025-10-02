@@ -214,7 +214,7 @@ $users = $pdo->query('SELECT id, name, login_id, role, birthdate, created_at FRO
     <div class="card">
         <div class="card-header">
             <h2>批量导入用户</h2>
-            <span class="muted">支持本地 Excel（.xlsx）模板，管理员账号将自动保留</span>
+            <span class="muted">支持本地 Excel（.xlsx）模板，管理员账号将自动保留，可下载 CSV 示例查看字段顺序</span>
         </div>
         <form method="post" enctype="multipart/form-data" class="import-form">
             <input type="hidden" name="action" value="import">
@@ -228,6 +228,7 @@ $users = $pdo->query('SELECT id, name, login_id, role, birthdate, created_at FRO
             <p class="muted">模板字段顺序需包含：姓名、工号、角色、出生日期。出生日期可为 YYYY-MM-DD、YYYYMMDD 或 Excel 日期格式。</p>
             <p class="muted">导入后，默认登录密码会重置为出生日期对应的 8 位数字。</p>
             <div class="form-actions">
+                <a class="ghost-button" href="<?= e(asset_url('templates/user_import_template.csv')) ?>" download>下载 CSV 示例</a>
                 <button type="submit">上传并导入</button>
             </div>
         </form>
