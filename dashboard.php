@@ -23,13 +23,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user['role'] === '管理员') {
 // Fetch projects related to the user
 $managedProjects = [];
 if ($user['role'] !== '管理员') {
-    $stmt = $pdo->prepare('SELECT * FROM projects WHERE manager_id = :manager_id ORDER BY name');
-    $stmt->execute(['manager_id' => $user['id']]);
+    // 查询负责的项目，并计算分配总额
+    $stmt = $pdo->prepare('SELECT p.*, COALESCE(SUM(a.amount), 0) AS allocated_sum 
+                            FROM projects p 
+                            LEFT JOIN allocations a ON p.project_id = a.project_id 
+                            WHERE p.manager_id = :manager_id 
+                            GROUP BY p.project_id 
+                            ORDER BY p.name');
+    $stmt->execute(['manager_id' => $user['login_id']]);
     $managedProjects = $stmt->fetchAll();
 }
 
-$stmt = $pdo->prepare('SELECT p.*, a.amount FROM allocations a JOIN projects p ON a.project_id = p.id WHERE a.user_id = :user_id ORDER BY p.name');
-$stmt->execute(['user_id' => $user['id']]);
+// 查询参与的项目，并计算分配总额
+$stmt = $pdo->prepare('SELECT p.*, a.amount, COALESCE(SUM(a2.amount), 0) AS allocated_sum 
+                        FROM allocations a 
+                        JOIN projects p ON a.project_id = p.project_id 
+                        LEFT JOIN allocations a2 ON p.project_id = a2.project_id 
+                        WHERE a.user_id = :user_id 
+                        GROUP BY p.project_id, a.amount 
+                        ORDER BY p.name');
+$stmt->execute(['user_id' => $user['login_id']]);
 $participatingProjects = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
@@ -105,6 +118,7 @@ $participatingProjects = $stmt->fetchAll();
                             <th>项目类别</th>
                             <th>项目层级</th>
                             <th>总金额</th>
+                            <th>分配状态</th>
                             <th>操作</th>
                         </tr>
                         </thead>
@@ -115,7 +129,16 @@ $participatingProjects = $stmt->fetchAll();
                                 <td><?= e($project['category']) ?></td>
                                 <td><?= e($project['level']) ?></td>
                                 <td><?= format_currency($project['total_amount']) ?></td>
-                                <td><a class="btn-link" href="<?= e(url_for('projects/manage.php')) ?>?id=<?= (int)$project['id'] ?>">编辑分配</a></td>
+                                <td>
+                                    <?php if ($project['allocated_sum'] && abs($project['allocated_sum'] - $project['total_amount']) <= 0.01): ?>
+                                        <span class="badge badge-success">已分配完成</span>
+                                    <?php elseif ($project['allocated_sum'] > 0): ?>
+                                        <span class="badge badge-pending">未完成分配</span>
+                                    <?php else: ?>
+                                        <span class="badge badge-info">未分配</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td><a class="btn-link" href="<?= e(url_for('projects/manage.php')) ?>?project_id=<?= (int)$project['project_id'] ?>">编辑分配</a></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
@@ -139,6 +162,7 @@ $participatingProjects = $stmt->fetchAll();
                             <th>项目名称</th>
                             <th>角色</th>
                             <th>分配金额</th>
+                            <th>分配状态</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -147,6 +171,13 @@ $participatingProjects = $stmt->fetchAll();
                                 <td><?= e($project['name']) ?></td>
                                 <td><?= e($user['role']) ?></td>
                                 <td><?= format_currency($project['amount']) ?></td>
+                                <td>
+                                    <?php if ($project['allocated_sum'] && abs($project['allocated_sum'] - $project['total_amount']) <= 0.01): ?>
+                                        <span class="badge badge-success">已分配完成</span>
+                                    <?php else: ?>
+                                        <span class="badge badge-pending">待分配</span>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>

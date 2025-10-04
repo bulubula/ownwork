@@ -11,6 +11,8 @@ $pdo = get_pdo();
 
 $keyword = trim($_GET['keyword'] ?? '');
 $role = trim($_GET['role'] ?? '');
+// 默认计算个人所得，除非显式指定不计算
+$calculate = !isset($_GET['no_calculate']) || $_GET['no_calculate'] !== '1';
 
 $where = [];
 $params = [];
@@ -25,45 +27,31 @@ if ($role !== '') {
     $params['role'] = $role;
 }
 
-// 获取总记录数的SQL
-$countSql = 'SELECT COUNT(DISTINCT u.id) FROM users u
-        LEFT JOIN allocations a ON a.user_id = u.id';
+$rows = [];
 
-if ($where) {
-    $countSql .= ' WHERE ' . implode(' AND ', $where);
+// 只有点击计算按钮后才执行查询
+if ($calculate) {
+    // 查询个人所得数据和项目数量
+    $sql = 'SELECT u.name, u.login_id, u.role, 
+            COALESCE(SUM(a.amount), 0) AS total_amount, 
+            COUNT(DISTINCT a.project_id) AS project_count
+            FROM users u
+            LEFT JOIN allocations a ON a.user_id = u.login_id';
+
+    if ($where) {
+        $sql .= ' WHERE ' . implode(' AND ', $where);
+    }
+
+    $sql .= ' GROUP BY u.login_id, u.name, u.role 
+              ORDER BY total_amount DESC, u.name';
+
+    $stmt = $pdo->prepare($sql);
+    foreach ($params as $key => $value) {
+        $stmt->bindValue($key, $value);
+    }
+    $stmt->execute();
+    $rows = $stmt->fetchAll();
 }
-
-$countStmt = $pdo->prepare($countSql);
-$countStmt->execute($params);
-$totalRows = $countStmt->fetchColumn();
-
-// 设置每页显示数量和当前页码
-$perPage = 10;
-$page = (int)($_GET['page'] ?? 1);
-$page = max(1, min($page, ceil($totalRows / $perPage)));
-$offset = ($page - 1) * $perPage;
-
-// 查询当前页的数据
-$sql = 'SELECT u.name, u.login_id, u.role, COALESCE(SUM(a.amount), 0) AS total_amount
-        FROM users u
-        LEFT JOIN allocations a ON a.user_id = u.id';
-
-if ($where) {
-    $sql .= ' WHERE ' . implode(' AND ', $where);
-}
-
-$sql .= ' GROUP BY u.id, u.name, u.login_id, u.role 
-          ORDER BY total_amount DESC, u.name
-          LIMIT :limit OFFSET :offset';
-
-$stmt = $pdo->prepare($sql);
-foreach ($params as $key => $value) {
-    $stmt->bindValue($key, $value);
-}
-$stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
-$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-$stmt->execute();
-$rows = $stmt->fetchAll();
 
 if (isset($_GET['export']) && $_GET['export'] === '1') {
     header('Content-Type: text/csv; charset=UTF-8');
@@ -101,6 +89,9 @@ if (isset($_GET['export']) && $_GET['export'] === '1') {
     </header>
 
     <div class="card">
+        <div class="filter-actions" style="margin-bottom: 1rem;">
+            <a class="btn-primary" href="<?= e(url_for('admin/personal_income.php')) ?>">重新计算个人所得</a>
+        </div>
         <form method="get" class="filter-form">
             <div class="filter-field">
                 <label>姓名/工号</label>
@@ -145,66 +136,44 @@ if (isset($_GET['export']) && $_GET['export'] === '1') {
             <table class="table">
                 <thead>
                 <tr>
+                    <th>序号</th>
                     <th>姓名</th>
                     <th>工号</th>
                     <th>角色</th>
+                    <th>项目数量</th>
                     <th>分配总额</th>
                 </tr>
                 </thead>
                 <tbody>
-                <?php if ($rows): ?>
-                    <?php foreach ($rows as $row): ?>
-                        <tr>
-                            <td><?= e($row['name']) ?></td>
-                            <td><?= e($row['login_id']) ?></td>
-                            <td><span class="badge"><?= e($row['role']) ?></span></td>
-                            <td><?= format_currency($row['total_amount']) ?></td>
-                        </tr>
-                    <?php endforeach; ?>
+                <?php if ($calculate): ?>
+                    <?php if ($rows): ?>
+                        <?php $index = 1; foreach ($rows as $row): ?>
+                            <tr>
+                                <td><?= $index++ ?></td>
+                                <td><?= e($row['name']) ?></td>
+                                <td><?= e($row['login_id']) ?></td>
+                                <td><span class="badge"><?= e($row['role']) ?></span></td>
+                                <td><?= (int)$row['project_count'] ?></td>
+                                <td><?= format_currency($row['total_amount']) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="6">暂无数据。</td></tr>
+                    <?php endif; ?>
                 <?php else: ?>
-                    <tr><td colspan="4">暂无数据。</td></tr>
+                    <tr>
+                        <td colspan="6" class="text-center">
+                            <div class="empty-state">
+                                <p>暂无个人所得数据</p>
+                            </div>
+                        </td>
+                    </tr>
                 <?php endif; ?>
                 </tbody>
             </table>
         </div>
         
-        <!-- 分页控件 -->
-        <div class="pagination">
-            <?php if ($page > 1): ?>
-                <a href="<?= e(url_for('admin/personal_income.php')) ?>?<?= e(http_build_query(array_filter(['keyword' => $keyword, 'role' => $role, 'page' => $page - 1]))) ?>" class="pagination-link">上一页</a>
-            <?php endif; ?>
-            
-            <?php 
-            // 生成页码链接，只显示当前页附近的页码
-            $totalPages = ceil($totalRows / $perPage);
-            $startPage = max(1, $page - 2);
-            $endPage = min($totalPages, $startPage + 4);
-            
-            if ($startPage > 1) {
-                echo '<a href="' . e(url_for('admin/personal_income.php')) . '?' . e(http_build_query(array_filter(['keyword' => $keyword, 'role' => $role, 'page' => 1]))) . '" class="pagination-link">1</a>';
-                if ($startPage > 2) {
-                    echo '<span class="pagination-ellipsis">...</span>';
-                }
-            }
-            
-            for ($i = $startPage; $i <= $endPage; $i++):
-            ?>
-                <a href="<?= e(url_for('admin/personal_income.php')) ?>?<?= e(http_build_query(array_filter(['keyword' => $keyword, 'role' => $role, 'page' => $i]))) ?>" class="pagination-link <?= $i === $page ? 'active' : '' ?>">
-                    <?= $i ?>
-                </a>
-            <?php endfor; ?>
-            
-            <?php if ($endPage < $totalPages): ?>
-                <?php if ($endPage < $totalPages - 1): ?>
-                    <span class="pagination-ellipsis">...</span>
-                <?php endif; ?>
-                <a href="<?= e(url_for('admin/personal_income.php')) ?>?<?= e(http_build_query(array_filter(['keyword' => $keyword, 'role' => $role, 'page' => $totalPages]))) ?>" class="pagination-link"><?= $totalPages ?></a>
-            <?php endif; ?>
-            
-            <?php if ($page < $totalPages): ?>
-                <a href="<?= e(url_for('admin/personal_income.php')) ?>?<?= e(http_build_query(array_filter(['keyword' => $keyword, 'role' => $role, 'page' => $page + 1]))) ?>" class="pagination-link">下一页</a>
-            <?php endif; ?>
-        </div>
+        <!-- 已取消分页功能，一次性显示所有数据 -->
     </div>
 </div>
 </body>

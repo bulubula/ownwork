@@ -26,12 +26,12 @@ function find_user_by_login_id(string $loginId): ?array
 function current_user(): ?array
 {
     start_session_once();
-    if (!isset($_SESSION['user_id'])) {
+    if (!isset($_SESSION['login_id'])) {
         return null;
     }
     $pdo = get_pdo();
-    $stmt = $pdo->prepare('SELECT * FROM users WHERE id = :id');
-    $stmt->execute(['id' => $_SESSION['user_id']]);
+    $stmt = $pdo->prepare('SELECT * FROM users WHERE login_id = :login_id');
+    $stmt->execute(['login_id' => $_SESSION['login_id']]);
     $user = $stmt->fetch();
     return $user ?: null;
 }
@@ -48,7 +48,7 @@ function login(string $loginId, string $password): bool
     }
 
     start_session_once();
-    $_SESSION['user_id'] = (int) $user['id'];
+    $_SESSION['login_id'] = $loginId;
     return true;
 }
 

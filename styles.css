@@ -73,6 +73,13 @@ p {
     line-height: 1.65;
 }
 
+p.muted-small {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin: 0 0 12px;
+    line-height: 1.5;
+}
+
 h1 {
     font-size: clamp(1.75rem, 2.2vw + 1.2rem, 2.5rem);
     font-weight: 700;
@@ -207,18 +214,32 @@ button:disabled,
 }
 
 .allocation-notice {
-    padding: 10px 16px;
-    margin: 10px 0;
+    padding: 8px 12px;
+    margin: 6px 0;
     background-color: #f9fafb;
     border-radius: 6px;
     border-left: 3px solid #e5e7eb;
+}
+
+.allocation-summary {
+    margin: 15px 0;
+    padding: 10px 15px;
+    background-color: #f0f9ff;
+    border-radius: 8px;
+    border: 1px solid #bae6fd;
+}
+
+.allocation-total {
+    font-weight: 600;
+    color: #0369a1;
+    font-size: 16px;
 }
 
 .small-text {
     font-size: 12px;
     color: #6b7280;
     margin: 0;
-    line-height: 1.5;
+    line-height: 1.4;
 }
 
 /* 开关样式 */
@@ -253,24 +274,68 @@ button[disabled] {
 /* 成员选择区域优化 */
 .member-actions {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  align-items: flex-end;
+}
+
+.member-actions button {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  height: 40px;
+  padding: 0 20px;
 }
 
 .member-picker {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row;
+  gap: 12px;
+  flex: 1 1 320px;
+  min-width: 0;
+  align-items: end;
 }
 
-.member-search {
-  padding: 8px 12px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  border-radius: 6px;
-  font-size: 14px;
+.member-search-group,
+.member-select-group {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.member-search-group {
+  flex: 1;
+}
+
+.member-select-group {
+  flex: 2;
+}
+
+.member-picker .member-search {
+  flex: 1;
   width: 100%;
-  max-width: 100%;
+}
+
+.member-picker select {
+  flex: 1;
+  width: 100%;
+  height: 40px !important;
+  padding: 8px 12px !important;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 8px;
+  background: white;
+  font-size: 14px;
+  cursor: pointer;
+  line-height: 24px;
+  margin-bottom: 0;
+}
+
+.member-picker button {
+  flex: 0 0 auto;
+  height: 40px;
+  align-self: flex-end;
+  padding: 0 20px;
 }
 
 .switch {
@@ -407,6 +472,11 @@ input:checked + .slider:before {
     color: #92400e;
 }
 
+.badge-info {
+    background: rgba(59, 130, 246, 0.18);
+    color: #1d4ed8;
+}
+
 form.inline {
     display: inline;
 }
@@ -465,8 +535,8 @@ form.inline {
 .member-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
-    margin-bottom: 20px;
+    gap: 8px;
+    margin-bottom: 12px;
     align-items: flex-end; /* 改为flex-end使元素底部对齐 */
 }
 
@@ -477,10 +547,25 @@ form.inline {
 
 .member-picker {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 8px;
     flex: 1 1 320px;
     min-width: 0; /* 防止flex子元素溢出 */
+    align-items: end;
+}
+
+.member-picker .member-search {
+    flex: 1;
+}
+
+.member-picker select {
+    flex: 2;
+}
+
+.member-picker button {
+    flex: 0 0 auto;
+    height: 40px;
+    align-self: flex-end;
 }
 
 .member-search-label {

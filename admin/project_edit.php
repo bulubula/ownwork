@@ -9,7 +9,7 @@ require_role(['管理员']);
 
 $pdo = get_pdo();
 $projectId = (int)($_GET['id'] ?? 0);
-$stmt = $pdo->prepare('SELECT * FROM projects WHERE id = :id');
+$stmt = $pdo->prepare('SELECT * FROM projects WHERE project_id = :id');
 $stmt->execute(['id' => $projectId]);
 $project = $stmt->fetch();
 
@@ -27,23 +27,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $category = trim($_POST['category'] ?? '');
     $level = trim($_POST['level'] ?? '');
     $totalAmount = (float)($_POST['total_amount'] ?? 0);
-    $managerId = (int)($_POST['manager_id'] ?? 0);
+    $managerLoginId = trim($_POST['manager_login_id'] ?? '');
 
-    if ($name === '' || $category === '' || $level === '' || $totalAmount <= 0 || $managerId <= 0) {
+    if ($name === '' || $category === '' || $level === '' || $totalAmount <= 0 || $managerLoginId === '') {
         $errors[] = '请完整填写项目信息。';
     } else {
+        // 验证负责人工号是否存在
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM users WHERE login_id = :login_id');
+        $stmt->execute(['login_id' => $managerLoginId]);
+        if ((int)$stmt->fetchColumn() === 0) {
+            $errors[] = '项目负责人工号不存在，请检查后重试。';
+        } else {
         try {
-            $stmt = $pdo->prepare('UPDATE projects SET name = :name, category = :category, level = :level, total_amount = :total_amount, manager_id = :manager_id WHERE id = :id');
+            $stmt = $pdo->prepare('UPDATE projects SET name = :name, category = :category, level = :level, total_amount = :total_amount, manager_id = :manager_id WHERE project_id = :id');
             $stmt->execute([
                 'name' => $name,
                 'category' => $category,
                 'level' => $level,
                 'total_amount' => $totalAmount,
-                'manager_id' => $managerId,
+                'manager_id' => $managerLoginId,
                 'id' => $projectId,
             ]);
             $success = '项目已更新。';
-            $stmt = $pdo->prepare('SELECT * FROM projects WHERE id = :id');
+            $stmt = $pdo->prepare('SELECT * FROM projects WHERE project_id = :id');
             $stmt->execute(['id' => $projectId]);
             $project = $stmt->fetch();
         } catch (PDOException $exception) {
@@ -53,10 +59,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = '更新失败：' . $exception->getMessage();
             }
         }
+        }
     }
 }
 
-$users = $pdo->query('SELECT id, name, role, login_id FROM users ORDER BY name')->fetchAll();
+$users = $pdo->query('SELECT login_id, name, role FROM users ORDER BY name')->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -94,9 +101,10 @@ $users = $pdo->query('SELECT id, name, role, login_id FROM users ORDER BY name')
             <label>项目总金额</label>
             <input type="number" step="0.01" name="total_amount" value="<?= e($project['total_amount']) ?>" required>
             <label>项目负责人</label>
-            <select name="manager_id" required>
+            <select name="manager_login_id" required>
+                <option value="">请选择负责人</option>
                 <?php foreach ($users as $u): ?>
-                    <option value="<?= (int)$u['id'] ?>" <?= $project['manager_id'] == $u['id'] ? 'selected' : '' ?>><?= e($u['name']) ?>（工号：<?= e($u['login_id']) ?>｜<?= e($u['role']) ?>）</option>
+                    <option value="<?= e($u['login_id']) ?>" <?= $project['manager_id'] == $u['login_id'] ? 'selected' : '' ?>><?= e($u['name']) ?>（工号：<?= e($u['login_id']) ?>｜<?= e($u['role']) ?>）</option>
                 <?php endforeach; ?>
             </select>
             <button type="submit">保存</button>

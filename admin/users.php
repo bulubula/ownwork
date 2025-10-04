@@ -61,6 +61,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     $row = $rows[$i];
                                     $name = trim($row[$headerMap['姓名']] ?? '');
                                     $loginId = trim($row[$headerMap['工号']] ?? '');
+                            if (!is_numeric($loginId) || (int)$loginId != $loginId) {
+                                $errors[] = '第 ' . $rowNumber . ' 行的工号必须为整数。';
+                                continue;
+                            }
+                            $loginId = (int)$loginId;
                                     $role = trim($row[$headerMap['角色']] ?? '');
                                     $rawBirthdate = $row[$headerMap['出生日期']] ?? '';
                                     $birthdate = excel_serial_to_date_string($rawBirthdate);
@@ -97,10 +102,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 }
                             }
 
-                            $mode = $_POST['mode'] ?? 'append';
-                            if (!in_array($mode, ['append', 'replace'], true)) {
-                                $mode = 'append';
-                            }
+                            // 固定为仅新增模式
+                            $mode = 'append';
 
                             if (!$errors && !$records) {
                                 $errors[] = 'Excel 文件中没有可导入的数据行。';
@@ -169,36 +172,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     } elseif ($action === 'reset_password') {
-        $userId = (int)($_POST['user_id'] ?? 0);
-        $stmt = $pdo->prepare('SELECT birthdate FROM users WHERE id = :id');
-        $stmt->execute(['id' => $userId]);
+        $loginId = $_POST['login_id'] ?? '';
+        $stmt = $pdo->prepare('SELECT birthdate FROM users WHERE login_id = :login_id');
+        $stmt->execute(['login_id' => $loginId]);
         $user = $stmt->fetch();
         if ($user) {
-            $stmt = $pdo->prepare('UPDATE users SET password_hash = :password_hash WHERE id = :id');
+            $stmt = $pdo->prepare('UPDATE users SET password_hash = :password_hash WHERE login_id = :login_id');
             $stmt->execute([
                 'password_hash' => hash_initial_password($user['birthdate']),
-                'id' => $userId,
+                'login_id' => $loginId,
             ]);
-            $success = '密码已重置为出生日期（8位数字）。';
+            $success = '密码已重置为出生日期（8 位数字）。';
         }
     }
 }
 
-// 获取总用户数
-$totalUsers = $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
-
-// 设置每页显示数量和当前页码
-$perPage = 10;
-$page = (int)($_GET['page'] ?? 1);
-$page = max(1, min($page, ceil($totalUsers / $perPage)));
-$offset = ($page - 1) * $perPage;
-
-// 查询当前页的用户数据
-$users = $pdo->prepare('SELECT id, name, login_id, role, birthdate, created_at FROM users ORDER BY id ASC LIMIT :limit OFFSET :offset');
-$users->bindValue(':limit', $perPage, PDO::PARAM_INT);
-$users->bindValue(':offset', $offset, PDO::PARAM_INT);
-$users->execute();
-$users = $users->fetchAll();
+// 查询所有用户数据（取消分页）
+$stmt = $pdo->prepare('SELECT id, name, login_id, role, birthdate, created_at FROM users ORDER BY id ASC');
+$stmt->execute();
+$users = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -234,13 +226,7 @@ $users = $users->fetchAll();
             <input type="hidden" name="action" value="import">
             <label for="user_file">选择 Excel 文件</label>
             <input type="file" name="user_file" id="user_file" accept=".xlsx" required>
-            <fieldset class="import-mode">
-                <legend>导入模式</legend>
-                <label><input type="radio" name="mode" value="append" checked> 仅新增（忽略已存在的工号）</label>
-                <label><input type="radio" name="mode" value="replace"> 清空后导入（保留所有管理员账号）</label>
-            </fieldset>
-            <p class="muted">模板字段顺序需包含：姓名、工号、角色、出生日期。出生日期可为 YYYY-MM-DD、YYYYMMDD 或 Excel 日期格式。</p>
-            <p class="muted">导入后，默认登录密码会重置为出生日期对应的 8 位数字。</p>
+            <p class="muted-small">模板字段顺序需包含：姓名、工号、角色、出生日期。出生日期可为 YYYY-MM-DD、YYYYMMDD 或 Excel 日期格式。导入后，默认登录密码会重置为出生日期对应的 8 位数字。</p>
             <div class="form-actions">
                 <a class="ghost-button" href="<?= e(asset_url('templates/user_import_template.xlsx')) ?>" download>下载导入示例</a>
                 <button type="submit">上传并导入</button>
@@ -264,9 +250,13 @@ $users = $users->fetchAll();
                 </tr>
                 </thead>
                 <tbody>
-                <?php foreach ($users as $row): ?>
+                <?php 
+                // 使用固定序号
+                $currentSerial = 1;
+                foreach ($users as $row): 
+                ?>
                     <tr>
-                        <td><?= (int)$row['id'] ?></td>
+                        <td><?= $currentSerial ?></td>
                         <td><?= e($row['name']) ?></td>
                         <td><?= e($row['login_id']) ?></td>
                         <td><span class="badge"><?= e($row['role']) ?></span></td>
@@ -275,53 +265,17 @@ $users = $users->fetchAll();
                         <td>
                             <form method="post" class="inline" onsubmit="return confirm('确认将密码重置为出生日期（8位数字）吗？');">
                                 <input type="hidden" name="action" value="reset_password">
-                                <input type="hidden" name="user_id" value="<?= (int)$row['id'] ?>">
+                                <input type="hidden" name="login_id" value="<?= e($row['login_id']) ?>">
                                 <button type="submit" class="secondary">重置密码</button>
                             </form>
                         </td>
                     </tr>
-                <?php endforeach; ?>
+                <?php $currentSerial++; endforeach; ?>
                 </tbody>
             </table>
         </div>
         
-        <!-- 分页控件 -->
-        <div class="pagination">
-            <?php if ($page > 1): ?>
-                <a href="<?= e(url_for('admin/users.php')) ?>?page=<?= $page - 1 ?>" class="pagination-link">上一页</a>
-            <?php endif; ?>
-            
-            <?php 
-            // 生成页码链接，只显示当前页附近的页码
-            $totalPages = ceil($totalUsers / $perPage);
-            $startPage = max(1, $page - 2);
-            $endPage = min($totalPages, $startPage + 4);
-            
-            if ($startPage > 1) {
-                echo '<a href="' . e(url_for('admin/users.php')) . '?page=1" class="pagination-link">1</a>';
-                if ($startPage > 2) {
-                    echo '<span class="pagination-ellipsis">...</span>';
-                }
-            }
-            
-            for ($i = $startPage; $i <= $endPage; $i++):
-            ?>
-                <a href="<?= e(url_for('admin/users.php')) ?>?page=<?= $i ?>" class="pagination-link <?= $i === $page ? 'active' : '' ?>">
-                    <?= $i ?>
-                </a>
-            <?php endfor; ?>
-            
-            <?php if ($endPage < $totalPages): ?>
-                <?php if ($endPage < $totalPages - 1): ?>
-                    <span class="pagination-ellipsis">...</span>
-                <?php endif; ?>
-                <a href="<?= e(url_for('admin/users.php')) ?>?page=<?= $totalPages ?>" class="pagination-link"><?= $totalPages ?></a>
-            <?php endif; ?>
-            
-            <?php if ($page < $totalPages): ?>
-                <a href="<?= e(url_for('admin/users.php')) ?>?page=<?= $page + 1 ?>" class="pagination-link">下一页</a>
-            <?php endif; ?>
-        </div>
+        <!-- 已取消分页功能，一次性显示所有数据 -->
     </div>
 </div>
 </body>
