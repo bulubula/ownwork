@@ -11,13 +11,11 @@
 
 ## 部署步骤
 
-1. 创建数据库并执行初始化脚本：
+1. 创建数据库并初始化：
 
-   ```bash
-   mysql -u root -p -e "CREATE DATABASE reward_app DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-   mysql -u root -p reward_app < database/schema.sql
-   mysql -u root -p reward_app < database/seed.sql
-   ```
+users.sql
+projects.sql
+allocations.sql
 
 2. 根据实际情况设置数据库连接环境变量（或直接修改 `includes/db.php` 中的默认值）：
 
@@ -35,12 +33,7 @@
 
 | 用户编号 | 姓名       | 角色     | 初始密码 |
 | -------- | ---------- | -------- | -------- |
-| admin01  | 系统管理员 | 管理员   | 19800101 |
-| u1001    | 张三       | 普通用户 | 19900505 |
-| u1002    | 李四       | 中层     | 19850210 |
-| u1003    | 王五       | 普通用户 | 19920820 |
-| u1004    | 赵六       | 中层     | 19880912 |
-| u1005    | 孙七       | 普通用户 | 19951130 |
+| 1001  | 系统管理员 | 管理员   | 19800101 |
 
 登录后可以在“控制面板”根据角色进入不同功能：
 
