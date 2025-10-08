@@ -194,7 +194,8 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
         <div class="allocation-notice">
             <p class="small-text">温馨提醒：单个中层人员的分配金额不能超过项目总金额的10%，中层人员的分配金额合计不能超过项目总金额的30%。</p>
         </div>
-        <form class="member-actions"<?= !$allocation_enabled ? ' disabled' : '' ?>>
+        <form class="member-actions" method="post"<?= !$allocation_enabled ? ' disabled' : '' ?>>
+            <input type="hidden" name="action" value="add_member">
             <div class="member-picker">
                 <div class="member-search-group">
                     <label class="member-search-label" for="member-search">搜索成员</label>
@@ -217,45 +218,43 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
             </div>
         </form>
 
-        <?php if ($allocations): ?>
-            <form method="post"<?= !$allocation_enabled ? ' disabled' : '' ?>>
-                <div class="table-wrapper">
-                    <table class="table">
-                        <thead>
+        <?php $hasAllocations = !empty($allocations); ?>
+        <form method="post"<?= !$allocation_enabled ? ' disabled' : '' ?>>
+            <div class="table-wrapper">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>成员</th>
+                        <th>工号</th>
+                        <th>角色</th>
+                        <th>分配金额</th>
+                        <th>操作</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($allocations as $allocation): ?>
                         <tr>
-                            <th>成员</th>
-                            <th>工号</th>
-                            <th>角色</th>
-                            <th>分配金额</th>
-                            <th>操作</th>
+                            <td><?= e($allocation['name']) ?></td>
+                            <td><?= e($allocation['login_id']) ?></td>
+                            <td><?= e($allocation['role']) ?></td>
+                            <td>
+                                <input type="hidden" name="allocation_id[]" value="<?= e($allocation['login_id']) ?>">
+                                <input type="number" step="0.01" name="amount[]" value="<?= e($allocation['amount']) ?>" required<?= !$allocation_enabled ? ' disabled' : '' ?>>
+                            </td>
+                            <td>
+                                <button type="button" name="remove" value="<?= e($allocation['login_id']) ?>" class="secondary" onclick="return confirm('确认删除该成员？');"<?= !$allocation_enabled ? ' disabled' : '' ?>>删除</button>
+                            </td>
                         </tr>
-                        </thead>
-                        <tbody>
-                        <?php foreach ($allocations as $allocation): ?>
-                            <tr>
-                                <td><?= e($allocation['name']) ?></td>
-                                <td><?= e($allocation['login_id']) ?></td>
-                                <td><?= e($allocation['role']) ?></td>
-                                <td>
-                                    <input type="hidden" name="allocation_id[]" value="<?= e($allocation['login_id']) ?>">
-                                    <input type="number" step="0.01" name="amount[]" value="<?= e($allocation['amount']) ?>" required<?= !$allocation_enabled ? ' disabled' : '' ?>>
-                                </td>
-                                <td>
-                                    <button type="button" name="remove" value="<?= e($allocation['login_id']) ?>" class="secondary" onclick="return confirm('确认删除该成员？');"<?= !$allocation_enabled ? ' disabled' : '' ?>>删除</button>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="allocation-summary">
-                    <span class="allocation-total">当前分配合计金额：<span id="total-amount"><?= format_currency(array_sum(array_column($allocations, 'amount'))) ?></span></span>
-                </div>
-                <button type="submit" name="save_allocations" value="1"<?= !$allocation_enabled ? ' disabled' : '' ?>>保存分配金额</button>
-            </form>
-        <?php else: ?>
-            <p class="muted">尚未添加任何项目成员。</p>
-        <?php endif; ?>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <p class="muted empty-hint" data-empty-hint<?= $hasAllocations ? ' style="display:none;"' : '' ?>>暂无成员</p>
+            <div class="allocation-summary">
+                <span class="allocation-total">当前分配合计金额：<span id="total-amount"><?= $hasAllocations ? format_currency(array_sum(array_column($allocations, 'amount'))) : format_currency(0) ?></span></span>
+            </div>
+            <button type="submit" name="save_allocations" value="1"<?= !$allocation_enabled ? ' disabled' : '' ?>>保存分配金额</button>
+        </form>
     </div>
 </div>
 <script>
@@ -263,12 +262,21 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
         var searchInput = document.getElementById('member-search');
         var select = document.getElementById('member-select');
         var addMemberForm = document.querySelector('.member-actions');
-        var allocationsTable = document.querySelector('.table tbody');
-        var saveAllocationsForm = document.querySelector('.table-wrapper').closest('form');
-        var remainingSlotsElement = document.querySelector('.muted span');
+        var tableWrapper = document.querySelector('.table-wrapper');
+        var allocationsTable = tableWrapper ? tableWrapper.querySelector('tbody') : null;
+        if (tableWrapper && !allocationsTable) {
+            var table = tableWrapper.querySelector('table');
+            if (table) {
+                allocationsTable = document.createElement('tbody');
+                table.appendChild(allocationsTable);
+            }
+        }
+        var saveAllocationsForm = tableWrapper ? tableWrapper.closest('form') : null;
+        var remainingSlotsElement = document.querySelector('.card-header .muted');
         var totalAmountElement = document.getElementById('total-amount');
-        
-        if (!searchInput || !select || !addMemberForm || !allocationsTable) {
+        var emptyHintElement = document.querySelector('[data-empty-hint]');
+
+        if (!searchInput || !select) {
             return;
         }
 
@@ -276,21 +284,23 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
         var allocations = []; // 存储当前分配的成员
 
         // 初始化现有分配
-        document.querySelectorAll('.table tbody tr').forEach(function(row) {
-            var userId = row.querySelector('input[name="allocation_id[]"]').value;
-            var name = row.cells[0].textContent;
-            var loginId = row.cells[1].textContent;
-            var role = row.cells[2].textContent;
-            var amount = row.querySelector('input[name="amount[]"]').value;
-            
-            allocations.push({
-                userId: userId,
-                name: name,
-                loginId: loginId,
-                role: role,
-                amount: amount
+        if (allocationsTable) {
+            allocationsTable.querySelectorAll('tr').forEach(function(row) {
+                var userId = row.querySelector('input[name="allocation_id[]"]').value;
+                var name = row.cells[0].textContent;
+                var loginId = row.cells[1].textContent;
+                var role = row.cells[2].textContent;
+                var amount = row.querySelector('input[name="amount[]"]').value;
+
+                allocations.push({
+                    userId: userId,
+                    name: name,
+                    loginId: loginId,
+                    role: role,
+                    amount: amount
+                });
             });
-        });
+        }
 
         // 计算并更新合计金额
         function updateTotalAmount() {
@@ -306,6 +316,7 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
 
         // 初始计算合计金额
         updateTotalAmount();
+        updateEmptyHint();
 
         function applyFilter(keyword) {
             var normalized = keyword.trim().toLowerCase();
@@ -362,89 +373,97 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
         });
 
         // 添加成员功能
-        addMemberForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            var selectedOption = select.options[select.selectedIndex];
-            if (!selectedOption || !selectedOption.value) {
-                alert('请选择一个成员');
-                return;
-            }
-            
-            var userId = selectedOption.value;
-            var name = selectedOption.textContent.split('（')[0];
-            var loginId = selectedOption.getAttribute('data-login') || userId;
-            
-            // 从选项的dataset中获取角色信息，如果不存在则使用默认值
-            var role = selectedOption.dataset.role || '员工';
-            
-            // 检查是否已添加
-            var exists = allocations.some(function(allocation) {
-                return allocation.userId === userId;
-            });
-            
-            if (exists) {
-                alert('该成员已添加到项目中');
-                return;
-            }
-            
-            // 检查名额限制
-            if (allocations.length >= 15) {
-                alert('项目成员已达到最大数量（15人）');
-                return;
-            }
-            
-            // 添加到分配列表
-            var allocation = {
-                userId: userId,
-                name: name,
-                loginId: loginId,
-                role: role,
-                amount: '0.00'
-            };
-            
-            allocations.push(allocation);
-            updateAllocationsTable();
-            updateAvailableMembers();
-            
-            // 重置选择
-            select.value = '';
-            searchInput.value = '';
-            applyFilter('');
-            
-            // 更新剩余名额
-            updateRemainingSlots();
-            
-            // 更新合计金额
-            updateTotalAmount();
-        });
-
-        // 删除成员功能
-        saveAllocationsForm.addEventListener('click', function(e) {
-            if (e.target.tagName === 'BUTTON' && e.target.name === 'remove') {
+        if (addMemberForm) {
+            addMemberForm.addEventListener('submit', function(e) {
                 e.preventDefault();
-                
-                var userId = e.target.value;
-                
-                // 从分配列表中移除
-                allocations = allocations.filter(function(allocation) {
-                    return allocation.userId !== userId;
+
+                var selectedOption = select.options[select.selectedIndex];
+                if (!selectedOption || !selectedOption.value) {
+                    alert('请选择一个成员');
+                    return;
+                }
+
+                var userId = selectedOption.value;
+                var name = selectedOption.textContent.split('（')[0];
+                var loginId = selectedOption.getAttribute('data-login') || userId;
+
+                // 从选项的dataset中获取角色信息，如果不存在则使用默认值
+                var role = selectedOption.dataset.role || '员工';
+
+                // 检查是否已添加
+                var exists = allocations.some(function(allocation) {
+                    return allocation.userId === userId;
                 });
-                
+
+                if (exists) {
+                    alert('该成员已添加到项目中');
+                    return;
+                }
+
+                // 检查名额限制
+                if (allocations.length >= 15) {
+                    alert('项目成员已达到最大数量（15人）');
+                    return;
+                }
+
+                // 添加到分配列表
+                var allocation = {
+                    userId: userId,
+                    name: name,
+                    loginId: loginId,
+                    role: role,
+                    amount: '0.00'
+                };
+
+                allocations.push(allocation);
                 updateAllocationsTable();
                 updateAvailableMembers();
+
+                // 重置选择
+                select.value = '';
+                searchInput.value = '';
+                applyFilter('');
+
+                // 更新剩余名额
                 updateRemainingSlots();
-                
+
                 // 更新合计金额
                 updateTotalAmount();
-            }
-        });
+            });
+        }
+
+        // 删除成员功能
+        if (saveAllocationsForm) {
+            saveAllocationsForm.addEventListener('click', function(e) {
+                if (e.target.tagName === 'BUTTON' && e.target.name === 'remove') {
+                    e.preventDefault();
+
+                    var userId = e.target.value;
+
+                    // 从分配列表中移除
+                    allocations = allocations.filter(function(allocation) {
+                        return allocation.userId !== userId;
+                    });
+
+                    updateAllocationsTable();
+                    updateAvailableMembers();
+                    updateRemainingSlots();
+
+                    // 更新合计金额
+                    updateTotalAmount();
+                }
+            });
+        }
 
         // 更新分配表格
         function updateAllocationsTable() {
             // 清空表格
+            if (!allocationsTable) {
+                return;
+            }
+
             allocationsTable.innerHTML = '';
-            
+
             // 添加所有分配成员
             allocations.forEach(function(allocation) {
                 var row = document.createElement('tr');
@@ -461,9 +480,11 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
                         <button type="button" name="remove" value="${allocation.userId}" class="secondary" onclick="return confirm('确认删除该成员？');">删除</button>
                     </td>
                 `;
-                
+
                 allocationsTable.appendChild(row);
             });
+
+            updateEmptyHint();
         }
 
         // 更新可用成员列表
@@ -490,11 +511,25 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
             }
         }
 
+        function updateEmptyHint() {
+            if (!emptyHintElement) {
+                return;
+            }
+
+            if (allocations.length === 0) {
+                emptyHintElement.style.display = '';
+            } else {
+                emptyHintElement.style.display = 'none';
+            }
+        }
+
         // 保存分配功能
-        saveAllocationsForm.addEventListener('submit', function(e) {
-            // 确保所有分配数据都包含在表单中
-            // 这里不需要特殊处理，因为表格已经包含了所有需要的数据
-        });
+        if (saveAllocationsForm) {
+            saveAllocationsForm.addEventListener('submit', function(e) {
+                // 确保所有分配数据都包含在表单中
+                // 这里不需要特殊处理，因为表格已经包含了所有需要的数据
+            });
+        }
     });
 </script>
 </body>
