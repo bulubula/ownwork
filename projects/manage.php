@@ -188,7 +188,7 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
     <div class="card">
         <div class="card-header">
             <h2>项目成员（最多15人）</h2>
-            <span class="muted">剩余名额 <?= $remainingSlots ?> 人</span>
+            <span id="remaining-slots" class="muted">剩余名额 <?= $remainingSlots ?> 人</span>
         </div>
         
         <div class="allocation-notice">
@@ -507,7 +507,8 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
         function updateRemainingSlots() {
             var remaining = Math.max(0, 15 - allocations.length);
             if (remainingSlotsElement) {
-                remainingSlotsElement.textContent = '剩余名额 ' + remaining + ' 人';
+                var message = '剩余名额 ' + remaining + ' 人';
+                remainingSlotsElement.textContent = message;
             }
         }
 
