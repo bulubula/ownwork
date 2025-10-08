@@ -188,7 +188,7 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
     <div class="card">
         <div class="card-header">
             <h2>项目成员（最多15人）</h2>
-            <span class="muted">剩余名额 <?= $remainingSlots ?> 人</span>
+            <span id="remaining-slots" class="muted">剩余名额 <?= $remainingSlots ?> 人</span>
         </div>
         
         <div class="allocation-notice">
@@ -265,7 +265,7 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
         var addMemberForm = document.querySelector('.member-actions');
         var allocationsTable = document.querySelector('.table tbody');
         var saveAllocationsForm = document.querySelector('.table-wrapper').closest('form');
-        var remainingSlotsElement = document.querySelector('.muted span');
+        var remainingSlotsElement = document.getElementById('remaining-slots');
         var totalAmountElement = document.getElementById('total-amount');
         
         if (!searchInput || !select || !addMemberForm || !allocationsTable) {
@@ -486,9 +486,13 @@ $allUsers = array_filter($availableMembers->fetchAll(), static function ($row) u
         function updateRemainingSlots() {
             var remaining = Math.max(0, 15 - allocations.length);
             if (remainingSlotsElement) {
-                remainingSlotsElement.textContent = '剩余名额 ' + remaining + ' 人';
+                var message = '剩余名额 ' + remaining + ' 人';
+                remainingSlotsElement.textContent = message;
             }
         }
+
+        // 初始化剩余名额显示
+        updateRemainingSlots();
 
         // 保存分配功能
         saveAllocationsForm.addEventListener('submit', function(e) {
