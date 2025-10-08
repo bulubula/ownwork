@@ -102,50 +102,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 }
                             }
 
-                            // 固定为仅新增模式
-                            $mode = 'append';
-
                             if (!$errors && !$records) {
                                 $errors[] = 'Excel 文件中没有可导入的数据行。';
                             }
 
                             if (!$errors && $records) {
                                 $loginIds = array_column($records, 'login_id');
-                                if ($mode === 'append') {
-                                    $placeholders = implode(',', array_fill(0, count($loginIds), '?'));
-                                    $stmt = $pdo->prepare('SELECT login_id FROM users WHERE login_id IN (' . $placeholders . ')');
-                                    $stmt->execute($loginIds);
-                                    $existing = $stmt->fetchAll(PDO::FETCH_COLUMN);
-                                    if ($existing) {
-                                        $errors[] = '以下工号已存在，导入终止：' . implode('、', $existing) . '。';
-                                    }
-                                }
-
-                                if ($mode === 'replace' && !$errors) {
-                                    $placeholders = implode(',', array_fill(0, count($loginIds), '?'));
-                                    $stmt = $pdo->prepare("SELECT login_id FROM users WHERE role = '管理员' AND login_id IN (" . $placeholders . ')');
-                                    $stmt->execute($loginIds);
-                                    $conflicts = $stmt->fetchAll(PDO::FETCH_COLUMN);
-                                    if ($conflicts) {
-                                        $errors[] = '管理员账号与导入工号冲突，导入终止：' . implode('、', $conflicts) . '。';
-                                    }
+                                $placeholders = implode(',', array_fill(0, count($loginIds), '?'));
+                                $stmt = $pdo->prepare('SELECT login_id FROM users WHERE login_id IN (' . $placeholders . ')');
+                                $stmt->execute($loginIds);
+                                $existing = $stmt->fetchAll(PDO::FETCH_COLUMN);
+                                if ($existing) {
+                                    $errors[] = '以下工号已存在，导入终止：' . implode('、', $existing) . '。';
                                 }
 
                                 if (!$errors) {
                                     try {
                                         $pdo->beginTransaction();
-
-                                        if ($mode === 'replace') {
-                                            $nonAdminIds = $pdo->query("SELECT id FROM users WHERE role <> '管理员'")->fetchAll(PDO::FETCH_COLUMN);
-                                            if ($nonAdminIds) {
-                                                $placeholders = implode(',', array_fill(0, count($nonAdminIds), '?'));
-                                                $stmt = $pdo->prepare('DELETE FROM allocations WHERE user_id IN (' . $placeholders . ')');
-                                                $stmt->execute($nonAdminIds);
-                                                $stmt = $pdo->prepare('DELETE FROM projects WHERE manager_id IN (' . $placeholders . ')');
-                                                $stmt->execute($nonAdminIds);
-                                            }
-                                            $pdo->exec("DELETE FROM users WHERE role <> '管理员'");
-                                        }
 
                                         $insert = $pdo->prepare('INSERT INTO users (name, login_id, role, birthdate, password_hash) VALUES (:name, :login_id, :role, :birthdate, :password_hash)');
                                         foreach ($records as $record) {
@@ -220,13 +193,13 @@ $users = $stmt->fetchAll();
     <div class="card">
         <div class="card-header">
             <h2>批量导入用户</h2>
-            <span class="muted">支持本地 Excel（.xlsx）模板，管理员账号将自动保留，可下载 CSV 示例查看字段顺序</span>
+            <span class="muted">支持本地 Excel（.xlsx）模板，仅新增用户数据且不会覆盖已有账号，可下载示例查看字段顺序</span>
         </div>
         <form method="post" enctype="multipart/form-data" class="import-form">
             <input type="hidden" name="action" value="import">
             <label for="user_file">选择 Excel 文件</label>
             <input type="file" name="user_file" id="user_file" accept=".xlsx" required>
-            <p class="muted-small">模板字段顺序需包含：姓名、工号、角色、出生日期。出生日期可为 YYYY-MM-DD、YYYYMMDD 或 Excel 日期格式。导入后，默认登录密码会重置为出生日期对应的 8 位数字。</p>
+            <p class="muted-small">模板字段顺序需包含：姓名、工号、角色、出生日期。出生日期可为 YYYY-MM-DD、YYYYMMDD 或 Excel 日期格式。若 Excel 中工号与系统现有账号重复，将终止导入；导入成功后，默认登录密码会重置为出生日期对应的 8 位数字。</p>
             <div class="form-actions">
                 <a class="ghost-button" href="<?= e(asset_url('templates/user_import_template.xlsx')) ?>" download>下载导入示例</a>
                 <button type="submit">上传并导入</button>
