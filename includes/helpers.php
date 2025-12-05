@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-function e(?string $value): string
+function e(mixed $value): string
 {
-    return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    return htmlspecialchars((string) ($value ?? ''), ENT_QUOTES, 'UTF-8');
 }
 
 function format_currency($amount): string
