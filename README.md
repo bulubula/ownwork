@@ -11,13 +11,16 @@
 
 ## 部署步骤
 
-1. 创建数据库并初始化：
+1. php扩展
+   mbstring、php-xml 
+
+2. 创建数据库并初始化：
 
 users.sql
 projects.sql
 allocations.sql
 
-2. 根据实际情况设置数据库连接环境变量（或直接修改 `includes/db.php` 中的默认值）：
+3. 根据实际情况设置数据库连接环境变量（或直接修改 `includes/db.php` 中的默认值）：
 
    ```bash
    export DB_HOST=127.0.0.1
