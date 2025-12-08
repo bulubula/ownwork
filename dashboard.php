@@ -59,7 +59,11 @@ $participatingProjects = $stmt->fetchAll();
             <h1>欢迎，<?= e($user['name']) ?></h1>
             <small>当前角色：<?= e($user['role']) ?></small>
         </div>
-        <a class="btn-link" href="<?= e(url_for('index.php')) ?>?action=logout">退出登录</a>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <a class="btn-link" href="<?= e(url_for('includes/change_password.php')) ?>">修改密码</a>
+            <span style="color: #ccc;">|</span>
+            <a class="btn-link" href="<?= e(url_for('index.php')) ?>?action=logout">退出登录</a>
+        </div>
     </header>
 
     <?php if ($user['role'] === '管理员'): ?>
